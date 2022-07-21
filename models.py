@@ -147,9 +147,9 @@ class Reproducciones(db.Model):
     ultima_reproduccion=db.Column(db.DateTime,nullable=True)
 
     @classmethod
-    def create(id_usuario,id_cancion,cantidad_reproducciones,ultima_reproduccion):
-        cancion=Canciones(id_usuario=id_usuario,id_cancion=id_cancion,cantidad_reproducciones=cantidad_reproducciones,ultima_reproduccion=ultima_reproduccion)
-        return cancion.save()
+    def create(cls,id_usuario,id_cancion,cantidad_reproducciones,ultima_reproduccion):
+        reproducciones=Reproducciones(id_usuario=id_usuario,id_cancion=id_cancion,cantidad_reproducciones=cantidad_reproducciones,ultima_reproduccion=ultima_reproduccion)
+        return reproducciones.save()
     
     def save(self):
         try:
@@ -175,3 +175,4 @@ class Reproducciones(db.Model):
             'cantidad_reproducciones':self.cantidad_reproducciones,
             'ultima_reproduccion':self.ultima_reproduccion,
         }
+

@@ -1,6 +1,10 @@
+from calendar import month
 from flask import Flask, jsonify,request
 from config import config
 from models import Canciones, Facturas, Reproducciones, db, Personas
+
+from datetime import datetime
+from datetime import timedelta
 
 
 def create_app(enviroment):
@@ -17,10 +21,11 @@ def create_app(enviroment):
 enviroment = config['development']
 app = create_app(enviroment)
 
-#PERSONAS
+
 @app.route('/')
 def holamundo():
     return 'Hola Mundo!'
+#PERSONAS
 #===============================================================================#
 @app.route('/api/personas', methods=['GET'])
 def get_personas():
@@ -153,10 +158,12 @@ def delete_reproduccion(id_usuario,id_cancion):
 @app.route('/api/reproducciones', methods=['POST'])
 def put_reproduccion():
     json = request.get_json()
-    reproducciones = Reproducciones.create(json['id_usuario'],json['id_cancion'],json['cantidad_reproducciones'],json['ultima_reproduccion'])
+    reproducciones = Reproducciones.create(json["id_usuario"],json['id_cancion'],json['cantidad_reproducciones'],json['ultima_reproduccion'])
     response = jsonify(reproducciones.json())
     return response
 
+
+#ENDPOINS
 #===============================================================================#
 @app.route('/api/reproducciones/<id_usuario>/<id_cancion>', methods=['PUT'])
 def editar_reproduccion(id_usuario,id_cancion):
@@ -167,6 +174,85 @@ def editar_reproduccion(id_usuario,id_cancion):
     reproduccion.update()
     return jsonify(reproduccion.json())
 
+#===============================================================================#
+@app.route('/api/personas/<id>/facturas', methods=['GET'])
+def facturas_pagadas(id):
+
+    query=db.text('select id,monto_facturado,fecha_facturacion,fecha_vencimiento from facturas '
+                        'where id_usuario ='+id+' and estado = false')
+    result = db.session.execute(query)
+    facturas = {"facturas":[]}
+    for row in result:
+            facturas["mensaje"]="El usuario tiene facturas vencidas"
+            facturas["facturas"].append({"id_factura":row[0],"monto_factura":row[1],"fecha_facturacion":row[2],"fecha_vencimiento":row[3]})
+    if len(facturas["facturas"])==0:
+        facturas.pop("facturas",None)
+        facturas["mensaje"]="el usuario no tiene facturas pendientes."
+    response=jsonify(facturas)
+    return response
+
+#===============================================================================#
+@app.route('/api/facturas/sum', methods=['GET'])
+def deuda():
+    query=db.text("select sum(monto_facturado) from facturas "
+                        "where estado = 'false' "
+                        "group by id_usuario")
+    result = db.session.execute(query)
+    deudas = {"qty_personas":0,"qty_dinero":0}
+    for row in result:
+        deudas["qty_personas"]+=1
+        deudas["qty_dinero"]+=row[0]
+    response=jsonify(deudas)
+    return response
+
+#===============================================================================#
+@app.route('/api/facturas/ganancias', methods=['GET'])
+def ganancias():
+    fechaactual=datetime.now()
+    un_mes_antes= fechaactual - timedelta(days=30)
+    query=db.text("select sum(monto_facturado) from facturas "
+                    "where fecha_hora_pago>'"+un_mes_antes.strftime("%Y-%m-%d")+"'" )
+    result = db.session.execute(query)
+    ganancias={"qty_dinero":0}
+    for row in result:
+        ganancias["qty_dinero"]+=row[0]
+    response=jsonify(ganancias)
+    return response
+
+#===============================================================================#
+@app.route('/api/personas/<id>/masReprod', methods=['GET'])
+def maxRepro(id):
+    query=db.text("select id_cancion,nombre,cantidad_reproducciones from reproducciones inner join canciones on canciones.id = reproducciones.id_cancion "
+                        "where id_usuario ="+id+" "
+                        "order by cantidad_reproducciones desc "
+                        "limit 10 ")
+    result = db.session.execute(query)
+    TopCanciones={"top_ten":[]}
+    for row in result:
+        TopCanciones["top_ten"].append({"id_cancion":row[0],"nombre_cancion":row[1],"reproducciones":row[2]})
+    if len(TopCanciones["top_ten"])==0:
+        TopCanciones.pop("top_ten",None)
+        TopCanciones["mensaje"]="El usuario no a escuchado canciones"
+    response=jsonify(TopCanciones)
+    return response
+
+
+#===============================================================================#
+@app.route('/api/canciones/max', methods=['GET'])
+def CancionesMax():
+    query=db.text("select id_cancion,nombre,sum from (select id_cancion,sum(cantidad_reproducciones) from reproducciones "
+                        "group by id_cancion) as SumaRC inner join canciones on SumaRC.id_cancion = canciones.id "
+                        "order by sum desc "
+                        "limit 10 ")
+    result = db.session.execute(query)
+    TopCanciones={"top_ten":[]}
+    for row in result:
+        TopCanciones["top_ten"].append({"id_cancion":row[0],"nombre_cancion":row[1],"reproducciones_Totales":row[2]})
+    if len(TopCanciones["top_ten"])==0:
+        TopCanciones.pop("top_ten",None)
+        TopCanciones["mensaje"]="No hay canciones reproducidas"
+    response=jsonify(TopCanciones)
+    return response
 
 
 
